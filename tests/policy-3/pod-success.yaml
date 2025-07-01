@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-pod
+  namespace: test
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+  - name: sec-ctx-demo
+    image: busybox
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-system
+  namespace: kube-system
+spec:
+  containers:
+  - name: sec-ctx-demo
+    image: busybox

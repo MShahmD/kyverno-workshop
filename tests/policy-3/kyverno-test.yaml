@@ -1,0 +1,28 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: validate-nonroot
+policies:
+  - ../../policies/policy-3_cel.yaml
+resources:
+  - pod-success.yaml
+  - pod-fail.yaml
+results:
+  - policy: restrict-root-user
+    rule: validate-non-root
+    resources: 
+      - test/busybox-pod
+    kind: Pod
+    result: pass
+  - policy: restrict-root-user
+    rule: validate-non-root
+    resources: 
+      - kube-system/busybox-system
+    kind: Pod
+    result: pass
+  - policy: restrict-root-user
+    rule: validate-non-root
+    resources:
+      - test/busybox-fail
+    kind: Pod
+    result: fail

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-fail
+  namespace: test
+spec:
+  containers:
+  - name: sec-ctx-demo
+    image: busybox
+  securityContext:
+    runAsNonRoot: false
+    runAsUser: 0
