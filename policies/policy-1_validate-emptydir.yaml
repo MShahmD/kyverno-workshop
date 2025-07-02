@@ -57,4 +57,4 @@ spec:
                - key: "{{ element.emptyDir.sizeLimit }}"
                  operator: Equals
                  value: null   
-                 message: ""
+                 message: "Fehler sizeLimit ist nicht vorhanden"
