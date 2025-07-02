@@ -1,47 +1,60 @@
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: require-emptydir-sizelimit
+  name: require-emptydir-requests-and-limits
   annotations:
-    policies.kyverno.io/title: Require Sizelimit for EmpyDir
+    policies.kyverno.io/title: Require Requests and Limits for emptyDir
+    policies.kyverno.io/category: Other
     policies.kyverno.io/severity: medium
+    policies.kyverno.io/minversion: 1.9.0
+    kyverno.io/kyverno-version: 1.11.1
+    kyverno.io/kubernetes-version: "1.27"
     policies.kyverno.io/subject: Pod
-    pod-policies.kyverno.io/autogen-controllers: none
     policies.kyverno.io/description: >-
-      When a Pod requests an emptyDir, by default it does not have a size limit which
-      may allow it to consume excess or all of the space in the medium backing the volume.
-      This can quickly overrun a Node and may result in a denial of service for other
-      workloads. This policy validates if sizeLimit is set to all Pods mounting emptyDir
-      volumes.    
+      Pods which mount emptyDir volumes may be allowed to potentially overrun
+      the medium backing the emptyDir volume. This sample ensures that any
+      initContainers or containers mounting an emptyDir volume have
+      ephemeral-storage requests and limits set. Policy will be skipped if
+      the volume has already a sizeLimit set.
 spec:
+  background: false
   validationFailureAction: Audit
-  background: true
   rules:
-  - name: validate-sizelimit
-    match:
-      any:
-      - resources:
-          kinds:
-          - Pod
-    validate:
-      foreach:
-      - list: "request.object.spec.volumes[]"
-        deny:
-          conditions:
-            all:
-              - key: "{{ element.name || '' }}"
-                operator: AnyNotIn
-                value: 
-                - istio-envoy
-                - istio-data
-                - workload-certs
-                - credential-socket
-                - workload-socket
-              - key: "{{element.keys(@)}}"
-                operator: AnyIn
-                value: emptyDir
-                message: "A sizelimit for EmptyDir in volume {{ element.name }} is required"
-              - key: "{{element.emptyDir.sizeLimit || '' }}"
-                operator: Equals
-                value: ''
-          
+    - name: check-emptydir-requests-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      context:
+      - name: emptydirnames
+        variable:
+          jmesPath: request.object.spec.volumes[?contains(keys(@), 'emptyDir') && !contains(keys(emptyDir), 'sizeLimit')].name
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.volumes[?contains(keys(@), 'emptyDir')] || `[]` | length(@) }}"
+            operator: GreaterThanOrEquals
+            value: 1
+          - key: "{{request.operation || 'BACKGROUND'}}"
+            operator: AnyIn
+            value:
+              - CREATE
+              - UPDATE
+      validate:
+        foreach:
+          - list: "request.object.spec.[initContainers, containers][]"
+            deny:
+              conditions:
+              - key: "{{ element.name }}"
+                operator: In
+                value:
+                - "istio-envoy"
+                - "istio-data"
+                - "workload-certs"
+                - "credential-socket"
+                - "workload-socket"
+                negate: true 
+               - key: "{{ element.emptyDir.sizeLimit }}"
+                 operator: Equals
+                 value: null   
+                 message: ""
